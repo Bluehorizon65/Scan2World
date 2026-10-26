@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+playwright-report/
+test-results/
+data/
+exports/
+.superpowers/
+tests/fixtures/render-room/out/
+*.tsbuildinfo

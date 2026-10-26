@@ -1,0 +1,145 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  admin
+}
+
+enum JobKind {
+  reconstruction
+  processing
+  gamemap
+  export
+}
+
+enum JobStatus {
+  queued
+  validating
+  running
+  processing
+  exporting
+  completed
+  failed
+  cancelling
+  cancelled
+}
+
+enum AssetType {
+  point_cloud_sparse
+  point_cloud_dense
+  mesh_visual
+  mesh_collision
+  walkable
+  export_package
+  report
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(user)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  projects     Project[]
+}
+
+model Project {
+  id          String   @id @default(uuid()) @db.Uuid
+  ownerId     String   @db.Uuid
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  description String   @default("")
+  status      String   @default("draft")
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  uploads     Upload[]
+  jobs        Job[]
+  assets      Asset[]
+
+  @@index([ownerId, updatedAt])
+}
+
+model Upload {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @db.Uuid
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storageKey  String   @unique
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  sha256      String
+  width       Int
+  height      Int
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@unique([projectId, sha256])
+  @@index([projectId, createdAt])
+}
+
+model Job {
+  id             String     @id @default(uuid()) @db.Uuid
+  projectId      String     @db.Uuid
+  project        Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind           JobKind
+  status         JobStatus  @default(queued)
+  stage          String?
+  configuration  Json       @default("{}")
+  sourceAssetId  String?    @db.Uuid
+  startedAt      DateTime?
+  completedAt    DateTime?
+  errorCode      String?
+  errorMessage   String?
+  diagnostics    Json       @default("{}")
+  resultManifest Json?
+  attempts       Int        @default(0)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  events         JobEvent[]
+  assets         Asset[]
+
+  @@index([projectId, createdAt])
+  @@index([status])
+}
+
+model JobEvent {
+  id        String    @id @default(uuid()) @db.Uuid
+  jobId     String    @db.Uuid
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status    JobStatus
+  stage     String?
+  message   String?
+  createdAt DateTime  @default(now())
+
+  @@index([jobId, createdAt])
+}
+
+model Asset {
+  id            String    @id @default(uuid()) @db.Uuid
+  projectId     String    @db.Uuid
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jobId         String?   @db.Uuid
+  job           Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  parentAssetId String?   @db.Uuid
+  parent        Asset?    @relation("AssetLineage", fields: [parentAssetId], references: [id], onDelete: SetNull)
+  children      Asset[]   @relation("AssetLineage")
+  name          String
+  storageKey    String    @unique
+  assetType     AssetType
+  format        String
+  sizeBytes     Int
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+
+  @@index([projectId, createdAt])
+}

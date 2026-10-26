@@ -1,0 +1,19 @@
+# Shared lint/type/test config for all Python services.
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+ignore = ["S101", "S603", "B008"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+extraPaths = ["common"]
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+exclude = [".venv", "**/__pycache__"]
+
+[tool.pytest.ini_options]
+pythonpath = ["common"]

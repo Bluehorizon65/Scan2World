@@ -1,0 +1,11 @@
+# GPU override: enables CUDA COLMAP (dense reconstruction). Requires nvidia-container-toolkit.
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+services:
+  recon:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
