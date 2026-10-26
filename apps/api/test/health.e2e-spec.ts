@@ -25,7 +25,11 @@ describe('health', () => {
   it('GET /api/v1/config exposes upload limits to the UI', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/config');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ maxImages: expect.any(Number), maxFileBytes: expect.any(Number), minImages: expect.any(Number) });
+    expect(res.body).toEqual({
+      maxImages: expect.any(Number),
+      maxFileBytes: expect.any(Number),
+      minImages: expect.any(Number),
+    });
   });
 
   it('unknown route returns the structured error shape', async () => {

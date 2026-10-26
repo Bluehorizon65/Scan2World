@@ -7,7 +7,6 @@ from scipy.spatial import KDTree
 from trimesh.visual import ColorVisuals
 
 from s2w_common.app import ServiceError
-
 from s2w_common.storage import key_of
 
 from .io import load_cloud, output, save_mesh

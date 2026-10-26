@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: services } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libgl1 libgomp1 libusb-1.0-0
+      - run: python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -r vision/requirements.txt -r geometry/requirements.txt -r recon/requirements.txt
+      - run: .venv/bin/ruff check . && .venv/bin/ruff format --check .
+      - run: .venv/bin/pyright common vision recon geometry
+      - run: for s in common vision recon geometry; do (cd $s && ../.venv/bin/python -m pytest -q -p no:logging tests); done
+      - run: .venv/bin/pip install pip-audit && .venv/bin/pip-audit -r vision/requirements.txt -r geometry/requirements.txt || true # report only
+
+  api:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: apps/api } }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: scan2world, POSTGRES_PASSWORD: ci-password, POSTGRES_DB: scan2world }
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U scan2world" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql://scan2world:ci-password@127.0.0.1:5432/scan2world_test
+      REDIS_URL: redis://127.0.0.1:6379/1
+      SERVICE_TOKEN: ci-service-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/api/package-lock.json }
+      - run: cp ../../.env.example ../../.env
+      - run: npm ci && npx prisma generate
+      - run: npm run lint -- --max-warnings=0
+      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npx jest
+      - run: npx jest --config test/jest-e2e.json
+      - run: npm audit --omit=dev --audit-level=high || true # report only
+
+  web:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: apps/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
+      - run: npm ci
+      - run: npm run lint && npm run typecheck && npm test && npm run build
+
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env && docker compose config -q
+      # recon (COLMAP CUDA base, ~9 GB) is skipped to fit runner disk; it is built locally.
+      - run: docker compose build api vision geometry web
