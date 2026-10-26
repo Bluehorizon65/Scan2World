@@ -8,6 +8,7 @@ import { RedisModule } from '../redis.service';
 import { StorageModule } from '../storage/storage.service';
 import { GeometryRunner } from './geometry.runner';
 import { ReconstructionRunner } from './reconstruction.runner';
+import { WorkerLifecycle } from './lifecycle';
 import { WorkerService } from './worker.service';
 
 @Module({
@@ -20,6 +21,6 @@ import { WorkerService } from './worker.service';
     JobsCoreModule,
     AssetsCoreModule,
   ],
-  providers: [WorkerService, ReconstructionRunner, GeometryRunner],
+  providers: [WorkerService, WorkerLifecycle, ReconstructionRunner, GeometryRunner],
 })
 export class WorkerModule {}

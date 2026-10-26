@@ -1,15 +1,16 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { BeforeApplicationShutdown, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { JobKind } from '@prisma/client';
-import { Queue, Worker } from 'bullmq';
+import { DelayedError, Job as BullJob, Queue, Worker } from 'bullmq';
 import { bullConnection, QueuePayload } from '../jobs/queues';
 import { JobsService } from '../jobs/jobs.service';
 import { isTerminal } from '../jobs/state-machine';
 import { PrismaService } from '../prisma.service';
 import { GeometryRunner } from './geometry.runner';
+import { ShutdownError, WorkerLifecycle } from './lifecycle';
 import { ReconstructionRunner } from './reconstruction.runner';
 
 @Injectable()
-export class WorkerService implements OnApplicationBootstrap, OnApplicationShutdown {
+export class WorkerService implements OnApplicationBootstrap, BeforeApplicationShutdown {
   private readonly logger = new Logger(WorkerService.name);
   private workers: Worker<QueuePayload>[] = [];
 
@@ -18,20 +19,29 @@ export class WorkerService implements OnApplicationBootstrap, OnApplicationShutd
     private jobs: JobsService,
     private recon: ReconstructionRunner,
     private geometry: GeometryRunner,
+    private lifecycle: WorkerLifecycle,
   ) {}
 
   async onApplicationBootstrap() {
     await this.recoverOrphans();
     const common = { connection: bullConnection(), lockDuration: 60_000, maxStalledCount: 2 };
     this.workers = [
-      new Worker<QueuePayload>('reconstruction', (j) => this.recon.run(j.data.jobId), {
-        ...common,
-        concurrency: Number(process.env.RECON_CONCURRENCY ?? 1),
-      }),
-      new Worker<QueuePayload>('geometry', (j) => this.geometry.run(j.data.jobId, j.name as JobKind), {
-        ...common,
-        concurrency: Number(process.env.GEOMETRY_CONCURRENCY ?? 2),
-      }),
+      new Worker<QueuePayload>(
+        'reconstruction',
+        this.requeueOnShutdown((j) => this.recon.run(j.data.jobId)),
+        {
+          ...common,
+          concurrency: Number(process.env.RECON_CONCURRENCY ?? 1),
+        },
+      ),
+      new Worker<QueuePayload>(
+        'geometry',
+        this.requeueOnShutdown((j) => this.geometry.run(j.data.jobId, j.name as JobKind)),
+        {
+          ...common,
+          concurrency: Number(process.env.GEOMETRY_CONCURRENCY ?? 2),
+        },
+      ),
     ];
     for (const w of this.workers) {
       // Safety net: BullMQ gave up (e.g. stalled too often) but the DB still says the job is live.
@@ -43,9 +53,25 @@ export class WorkerService implements OnApplicationBootstrap, OnApplicationShutd
     this.logger.log('Worker started');
   }
 
-  async onApplicationShutdown() {
-    // Lets active jobs keep their DB state; BullMQ re-delivers them to the next worker as stalled jobs.
+  /** Runs before modules (Redis/Prisma) are destroyed, so in-flight runners can hand their jobs back cleanly. */
+  async beforeApplicationShutdown() {
+    this.lifecycle.stopping = true;
     await Promise.all(this.workers.map((w) => w.close()));
+  }
+
+  /** A runner interrupted by shutdown re-queues its job (DB status untouched) for the next worker to resume. */
+  private requeueOnShutdown(fn: (j: BullJob<QueuePayload>) => Promise<void>) {
+    return async (job: BullJob<QueuePayload>, token?: string) => {
+      try {
+        await fn(job);
+      } catch (err) {
+        if (err instanceof ShutdownError && token) {
+          await job.moveToDelayed(Date.now() + 1000, token);
+          throw new DelayedError();
+        }
+        throw err;
+      }
+    };
   }
 
   /** DB jobs that are live but unknown to the queue (e.g. Redis was wiped) can never progress: fail them. */

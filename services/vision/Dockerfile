@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PYTHONPATH=/
 WORKDIR /srv
 COPY common/requirements.txt common/requirements.txt
 COPY vision/requirements.txt vision/requirements.txt
-RUN pip install -r vision/requirements.txt
+RUN pip install -r vision/requirements.txt && python -c "import cv2, numpy"
 COPY common/s2w_common common/s2w_common
 COPY vision/app vision/app
 RUN useradd -u 1000 -m app && mkdir -p /data && chown app /data

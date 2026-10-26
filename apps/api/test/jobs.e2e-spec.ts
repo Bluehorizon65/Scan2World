@@ -141,6 +141,7 @@ describe('reconstruction jobs (stubbed python services)', () => {
     const start = recon.calls.find((c) => c.route === `POST /jobs/${job.id}`)!;
     expect(start.body.imageKeys).toHaveLength(3);
     expect(start.body.outputPrefix).toBe(`projects/${pid}/jobs/${job.id}`);
+    expect(start.body.singleCamera).toBe(true); // all test uploads share one resolution
 
     const assets = (await agent.get(`/api/v1/projects/${pid}/assets`)).body.items;
     const types = assets.map((a: { assetType: string }) => a.assetType).sort();
@@ -210,6 +211,24 @@ describe('reconstruction jobs (stubbed python services)', () => {
     expect(retry.body.id).not.toBe(created.id);
     expect(retry.body.configuration).toMatchObject({ quality: 'high', matcher: 'sequential' });
     await waitFor(agent, retry.body.id, ['failed']);
+  });
+
+  it('worker shutdown mid-job re-queues it (not failed) and a new worker resumes to completion', async () => {
+    const { agent, pid } = await projectWithImages();
+    scriptRecon('never');
+    const created = (await agent.post(`/api/v1/projects/${pid}/jobs/reconstruction`).send({ quality: 'draft' })).body;
+    await waitFor(agent, created.id, ['running']);
+    await worker.close(); // SIGTERM equivalent: runs Nest shutdown hooks
+    await sleep(200);
+    const during = (await agent.get(`/api/v1/jobs/${created.id}`)).body;
+    expect(during.status).toBe('running');
+
+    scriptRecon('completed');
+    worker = await NestFactory.createApplicationContext(WorkerModule, { logger: false });
+    const job = await waitFor(agent, created.id, ['completed', 'failed'], 15000);
+    expect({ status: job.status, error: job.errorMessage }).toEqual({ status: 'completed', error: null });
+    const starts = recon.calls.filter((c) => c.route === `POST /jobs/${created.id}`);
+    expect(starts.length).toBeGreaterThanOrEqual(2); // re-attached via the idempotent start call
   });
 
   it('rejects too few images, invalid config, and other users', async () => {

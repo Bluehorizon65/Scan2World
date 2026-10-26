@@ -8,6 +8,7 @@ import { JobsService } from '../jobs/jobs.service';
 import { isTerminal } from '../jobs/state-machine';
 import { PrismaService } from '../prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { ShutdownError, WorkerLifecycle } from './lifecycle';
 
 interface ReconConfig {
   quality: 'draft' | 'balanced' | 'high';
@@ -46,6 +47,7 @@ export class ReconstructionRunner {
     private python: PythonClient,
     private assets: AssetsService,
     private storage: StorageService,
+    private lifecycle: WorkerLifecycle,
   ) {}
 
   async run(jobId: string) {
@@ -63,6 +65,8 @@ export class ReconstructionRunner {
       if (job.status === 'processing') await this.meshAndRegister(job);
     } catch (err) {
       if (err instanceof Stopped) return;
+      // Errors caused by shutdown (closed connections etc.) must not fail the job; the next worker resumes it.
+      if (err instanceof ShutdownError || this.lifecycle.stopping) throw new ShutdownError();
       await this.fail(jobId, err);
     }
   }
@@ -98,6 +102,8 @@ export class ReconstructionRunner {
       quality: cfg.quality,
       matcher: cfg.matcher,
       dense: cfg.dense,
+      // one camera model for all photos only when they share a resolution (likely the same device)
+      singleCamera: new Set(uploads.map((u) => `${u.width}x${u.height}`)).size === 1,
     });
 
     const deadline =
@@ -106,6 +112,7 @@ export class ReconstructionRunner {
     let lastProgress = '';
     for (;;) {
       await sleep(env.pollMs);
+      if (this.lifecycle.stopping) throw new ShutdownError();
       await this.checkCancelled(job.id);
       if (Date.now() > deadline) {
         await this.python.call('recon', 'DELETE', `/jobs/${job.id}`).catch(() => undefined);

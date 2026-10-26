@@ -10,7 +10,9 @@ export class ServiceCallError extends AppError {
     message: string,
     readonly advice: string[] = [],
   ) {
-    super(status >= 500 ? 502 : status, code, message, advice.length ? { advice } : undefined);
+    // Only domain errors (400/409/413/415/422) pass through; auth/routing/server faults are ours, not the user's.
+    const internal = status >= 500 || status === 401 || status === 403 || status === 404;
+    super(internal ? 502 : status, internal ? 'service_error' : code, message, advice.length ? { advice } : undefined);
   }
 }
 

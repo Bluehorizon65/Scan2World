@@ -86,4 +86,14 @@ describe('dataset validation', () => {
       process.env.VISION_URL = prev;
     }
   });
+
+  it('an internal 404/401 from a python service surfaces as 502, never as the user-facing status', async () => {
+    const { agent } = await newUser(app);
+    const pid = (await agent.post('/api/v1/projects').send({ name: 'R' })).body.id;
+    await agent.post(`/api/v1/projects/${pid}/uploads`).attach('file', await makeImage(11), 'x.png');
+    stub.on('POST /analyze', () => ({ status: 404, body: { error: { code: 'not_found', message: 'Not Found' } } }));
+    const res = await agent.post(`/api/v1/projects/${pid}/validate`);
+    expect(res.status).toBe(502);
+    expect(res.body.error.code).toBe('service_error');
+  });
 });
