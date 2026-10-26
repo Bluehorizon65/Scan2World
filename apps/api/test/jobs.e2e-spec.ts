@@ -79,7 +79,7 @@ describe('reconstruction jobs (stubbed python services)', () => {
   }
 
   /** recon stub: walks through stages on successive polls per job id, then finishes as scripted. */
-  function scriptRecon(final: 'completed' | 'failed' | 'never') {
+  function scriptRecon(final: 'completed' | 'failed' | 'never' | 'crash') {
     const polls = new Map<string, number>();
     const prefixes = new Map<string, string>();
     const stages = ['feature_extraction', 'feature_matching', 'sparse_reconstruction'];
@@ -94,6 +94,8 @@ describe('reconstruction jobs (stubbed python services)', () => {
       if (method === 'DELETE') return { body: { id, status: 'cancelled' } };
       const n = (polls.get(id) ?? 0) + 1;
       polls.set(id, n);
+      if (final === 'crash' && n > 1)
+        return { status: 500, body: { error: { code: 'internal_error', message: 'boom' } } };
       if (n <= stages.length || final === 'never')
         return {
           body: { id, status: 'running', stage: stages[Math.min(n, stages.length) - 1], gpu: false, dense: false },
@@ -239,6 +241,16 @@ describe('reconstruction jobs (stubbed python services)', () => {
     expect({ status: job.status, error: job.errorMessage }).toEqual({ status: 'completed', error: null });
     const starts = recon.calls.filter((c) => c.route === `POST /jobs/${created.id}`);
     expect(starts.length).toBeGreaterThanOrEqual(2); // re-attached via the idempotent start call
+  });
+
+  it('a reconstruction that fails in the worker also stops the python job (no orphaned COLMAP)', async () => {
+    const { agent, pid } = await projectWithImages();
+    scriptRecon('crash');
+    const created = (await agent.post(`/api/v1/projects/${pid}/jobs/reconstruction`).send({ quality: 'draft' })).body;
+    const job = await waitFor(agent, created.id, ['failed']);
+    expect(job.errorCode).toBe('service_error');
+    await sleep(100);
+    expect(recon.calls.some((c) => c.route === `DELETE /jobs/${created.id}`)).toBe(true);
   });
 
   it('rejects too few images, invalid config, and other users', async () => {

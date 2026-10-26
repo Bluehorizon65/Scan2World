@@ -8,7 +8,7 @@ import { JobsService } from '../jobs/jobs.service';
 import { isTerminal } from '../jobs/state-machine';
 import { PrismaService } from '../prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { failJob } from './job-failure';
+import { failJob, isTransient } from './job-failure';
 import { ShutdownError, WorkerLifecycle } from './lifecycle';
 
 interface ReconConfig {
@@ -68,6 +68,8 @@ export class ReconstructionRunner {
       if (err instanceof Stopped) return;
       // Errors caused by shutdown (closed connections etc.) must not fail the job; the next worker resumes it.
       if (err instanceof ShutdownError || this.lifecycle.stopping) throw new ShutdownError();
+      // Never leave COLMAP running for a job we are about to mark failed.
+      await this.python.call('recon', 'DELETE', `/jobs/${jobId}`, undefined, { retries: 0 }).catch(() => undefined);
       await failJob(this.prisma, this.jobs, jobId, err);
     }
   }
@@ -114,37 +116,52 @@ export class ReconstructionRunner {
     for (;;) {
       await sleep(env.pollMs);
       if (this.lifecycle.stopping) throw new ShutdownError();
-      await this.checkCancelled(job.id);
-      if (Date.now() > deadline) {
-        await this.python.call('recon', 'DELETE', `/jobs/${job.id}`).catch(() => undefined);
-        throw new AppError(504, 'timeout', 'Reconstruction exceeded its time limit; try draft quality or fewer photos');
-      }
-      const s = await this.python.call<ReconStatus>('recon', 'GET', `/jobs/${job.id}`);
-      if (s.status === 'failed') {
-        throw new AppError(422, s.error?.code ?? 'reconstruction_failed', s.error?.message ?? 'Reconstruction failed', {
-          advice: s.error?.advice ?? [],
-          stage: s.stage,
-        });
-      }
-      if (s.status === 'cancelled')
-        throw new AppError(500, 'recon_cancelled', 'The reconstruction service cancelled the job');
-      if (s.stage && s.stage !== job.stage) {
-        job = await this.jobs.transition(job.id, 'running', {
-          stage: s.stage,
-          progress: s.progress ?? null,
-          diagnostics: { gpu: s.gpu, dense: s.dense },
-        });
-      } else if (s.progress && JSON.stringify(s.progress) !== lastProgress) {
-        await this.jobs.setProgress(job.id, s.progress);
-      }
-      lastProgress = JSON.stringify(s.progress ?? '');
-      if (s.status === 'completed') {
-        return this.jobs.transition(job.id, 'processing', {
-          stage: 'meshing',
-          progress: null,
-          message: s.dense ? 'Meshing the dense point cloud' : 'Meshing the sparse point cloud (no GPU: low detail)',
-          diagnostics: { gpu: s.gpu, dense: s.dense, stats: s.stats, outputs: s.outputs },
-        });
+      try {
+        await this.checkCancelled(job.id);
+        if (Date.now() > deadline) {
+          await this.python.call('recon', 'DELETE', `/jobs/${job.id}`).catch(() => undefined);
+          throw new AppError(
+            504,
+            'timeout',
+            'Reconstruction exceeded its time limit; try draft quality or fewer photos',
+          );
+        }
+        const s = await this.python.call<ReconStatus>('recon', 'GET', `/jobs/${job.id}`);
+        if (s.status === 'failed') {
+          throw new AppError(
+            422,
+            s.error?.code ?? 'reconstruction_failed',
+            s.error?.message ?? 'Reconstruction failed',
+            {
+              advice: s.error?.advice ?? [],
+              stage: s.stage,
+            },
+          );
+        }
+        if (s.status === 'cancelled')
+          throw new AppError(500, 'recon_cancelled', 'The reconstruction service cancelled the job');
+        if (s.stage && s.stage !== job.stage) {
+          job = await this.jobs.transition(job.id, 'running', {
+            stage: s.stage,
+            progress: s.progress ?? null,
+            diagnostics: { gpu: s.gpu, dense: s.dense },
+          });
+        } else if (s.progress && JSON.stringify(s.progress) !== lastProgress) {
+          await this.jobs.setProgress(job.id, s.progress);
+        }
+        lastProgress = JSON.stringify(s.progress ?? '');
+        if (s.status === 'completed') {
+          return this.jobs.transition(job.id, 'processing', {
+            stage: 'meshing',
+            progress: null,
+            message: s.dense ? 'Meshing the dense point cloud' : 'Meshing the sparse point cloud (no GPU: low detail)',
+            diagnostics: { gpu: s.gpu, dense: s.dense, stats: s.stats, outputs: s.outputs },
+          });
+        }
+      } catch (err) {
+        // A momentary DB outage (pool timeout, restart) must not fail a long reconstruction; the deadline still applies.
+        if (!isTransient(err)) throw err;
+        this.logger.warn(`job ${job.id}: transient database error while polling, retrying`);
       }
     }
   }

@@ -8,7 +8,7 @@ const HeroScene = lazy(() => import('./HeroScene'));
 
 const STAGES: { id: HeroStage; label: string; caption: string }[] = [
   { id: 'photos', label: 'Photos', caption: '36 photos, each recovered as a camera position in the room.' },
-  { id: 'points', label: 'Points', caption: '27,366 points triangulated from features matched across the photos.' },
+  { id: 'points', label: 'Points', caption: '27,321 points triangulated from features matched across the photos.' },
   { id: 'mesh', label: 'Mesh', caption: 'A coloured surface built from the points, levelled so the floor sits at zero.' },
   { id: 'collision', label: 'Collision', caption: 'A 1,500-triangle collision mesh, kept separate from the visual mesh.' },
 ];

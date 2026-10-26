@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AppError } from '../common/app-error';
 import { JobsService } from '../jobs/jobs.service';
 import { isTerminal } from '../jobs/state-machine';
@@ -21,4 +22,11 @@ export async function failJob(prisma: PrismaService, jobs: JobsService, jobId: s
     message,
     diagnostics: details,
   });
+}
+
+// Connection-level Prisma errors (pool timeout, unreachable/closed server): worth retrying, not failing a job.
+const TRANSIENT_DB_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017', 'P2024']);
+
+export function isTransient(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && TRANSIENT_DB_CODES.has(err.code);
 }

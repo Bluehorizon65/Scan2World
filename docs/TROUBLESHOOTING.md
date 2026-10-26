@@ -12,6 +12,7 @@
 | Upload/job rejected 507 | Disk below `MIN_FREE_DISK_GB`. Free space; old projects can be deleted in the UI. |
 | Job stuck? | Jobs cannot stay "running" forever: stage timeouts, overall timeout, and `worker_lost` on restart. Cancel from the UI if needed. |
 | Port already in use | Change `API_PORT` / `WEB_PORT` / `POSTGRES_PORT` / `REDIS_PORT` in `.env`. |
+| Jobs fail with `internal_error` while the machine is sluggish | Host out of memory (kswapd busy, no swap): close other stacks/VMs, lower `RECON_THREADS`, add swap. Transient DB timeouts are retried and a failed job always stops its COLMAP process. |
 | geometry container restarts with `lib…so: cannot open shared object` | Rebuild the image (`docker compose build geometry`); the Dockerfile verifies imports at build time. |
 
 Never use `docker compose down -v` to fix a problem: it deletes the database and all files.
