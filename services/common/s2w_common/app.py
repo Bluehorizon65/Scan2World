@@ -22,7 +22,12 @@ class ServiceError(Exception):
 
 class _JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        out = {"ts": round(record.created, 3), "level": record.levelname, "service": record.name, "msg": record.getMessage()}
+        out = {
+            "ts": round(record.created, 3),
+            "level": record.levelname,
+            "service": record.name,
+            "msg": record.getMessage(),
+        }
         out.update(getattr(record, "extra_fields", {}))
         if record.exc_info:
             out["exc"] = self.formatException(record.exc_info)
@@ -58,10 +63,18 @@ def create_app(service: str) -> FastAPI:
                 return JSONResponse(error_body("unauthorized", "Missing or invalid service token"), status_code=401)
         response = await call_next(request)
         if request.url.path != "/health":
-            log.info("request", extra={"extra_fields": {
-                "method": request.method, "path": request.url.path, "status": response.status_code,
-                "ms": round((time.monotonic() - start) * 1000), "request_id": request.headers.get("x-request-id"),
-            }})
+            log.info(
+                "request",
+                extra={
+                    "extra_fields": {
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status": response.status_code,
+                        "ms": round((time.monotonic() - start) * 1000),
+                        "request_id": request.headers.get("x-request-id"),
+                    }
+                },
+            )
         return response
 
     @app.exception_handler(ServiceError)
@@ -74,7 +87,9 @@ def create_app(service: str) -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_: Request, exc: RequestValidationError):
-        return JSONResponse(error_body("invalid_input", "Request validation failed", details=exc.errors()), status_code=422)
+        return JSONResponse(
+            error_body("invalid_input", "Request validation failed", details=exc.errors()), status_code=422
+        )
 
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception):

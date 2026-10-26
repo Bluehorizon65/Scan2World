@@ -17,3 +17,6 @@ exclude = [".venv", "**/__pycache__"]
 
 [tool.pytest.ini_options]
 pythonpath = ["common"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["s2w_common", "app"]
