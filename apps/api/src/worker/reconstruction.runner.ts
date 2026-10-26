@@ -154,7 +154,10 @@ export class ReconstructionRunner {
     const source = outputs.dense_ply ?? outputs.sparse_ply;
     if (!source) throw new AppError(500, 'missing_output', 'Reconstruction produced no point cloud');
     const prefix = `projects/${job.projectId}/jobs/${job.id}`;
-    const mesh = await this.python.call<{ outputs: { mesh_glb: string }; stats: Record<string, unknown> }>(
+    const mesh = await this.python.call<{
+      outputs: { mesh_glb: string; points_ply?: string };
+      stats: Record<string, unknown>;
+    }>(
       'geometry',
       'POST',
       '/mesh',
@@ -169,11 +172,17 @@ export class ReconstructionRunner {
 
     const registered = [];
     const base = { projectId: job.projectId, jobId: job.id };
+    // The cloud that was meshed is registered in its outlier-filtered form (stray SfM points removed);
+    // the raw COLMAP output stays untouched in the job folder.
+    const filtered = mesh.outputs.points_ply
+      ? { storageKey: mesh.outputs.points_ply, extra: { filtered: true, outliersRemoved: mesh.stats.outliersRemoved } }
+      : undefined;
+    const cloud = (key: string, meshed: boolean) => (meshed && filtered ? filtered : { storageKey: key, extra: {} });
     if (outputs.sparse_ply)
       registered.push(
         await this.registerOnce({
           ...base,
-          storageKey: outputs.sparse_ply,
+          ...cloud(outputs.sparse_ply, !outputs.dense_ply),
           assetType: 'point_cloud_sparse',
           name: 'Sparse point cloud',
         }),
@@ -182,7 +191,7 @@ export class ReconstructionRunner {
       registered.push(
         await this.registerOnce({
           ...base,
-          storageKey: outputs.dense_ply,
+          ...cloud(outputs.dense_ply, true),
           assetType: 'point_cloud_dense',
           name: 'Dense point cloud',
         }),

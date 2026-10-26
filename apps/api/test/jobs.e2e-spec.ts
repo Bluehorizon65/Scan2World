@@ -33,7 +33,13 @@ describe('reconstruction jobs (stubbed python services)', () => {
 
     geometry.on('POST /mesh', (b: { outputPrefix: string }) => {
       writeKey(`${b.outputPrefix}/mesh.glb`, 4096);
-      return { body: { outputs: { mesh_glb: `${b.outputPrefix}/mesh.glb` }, stats: { method: 'poisson' } } };
+      writeKey(`${b.outputPrefix}/points_filtered.ply`, 1500);
+      return {
+        body: {
+          outputs: { mesh_glb: `${b.outputPrefix}/mesh.glb`, points_ply: `${b.outputPrefix}/points_filtered.ply` },
+          stats: { method: 'poisson', outliersRemoved: 42 },
+        },
+      };
     });
     geometry.on('POST /inspect', (b: { key: string }) => ({
       body: b.key.endsWith('.glb')
@@ -150,6 +156,10 @@ describe('reconstruction jobs (stubbed python services)', () => {
     expect(mesh).toMatchObject({ format: 'glb', sizeBytes: 4096, jobId: job.id });
     expect(mesh.metadata.triangles).toBe(1000);
     expect(mesh.storageKey).toBeUndefined();
+    // the viewable cloud is the outlier-filtered one; the raw COLMAP cloud stays on disk
+    const cloud = assets.find((a: { assetType: string }) => a.assetType === 'point_cloud_sparse');
+    expect(cloud).toMatchObject({ sizeBytes: 1500 });
+    expect(cloud.metadata).toMatchObject({ filtered: true, outliersRemoved: 42 });
   });
 
   it('streams job events over SSE until terminal', async () => {

@@ -271,7 +271,8 @@ def parse_images_txt(text: str) -> list[dict]:
         rt = [[r[j][i] for j in range(3)] for i in range(3)]  # R^T
         center = [-sum(rt[i][k] * t for k, t in enumerate((tx, ty, tz))) for i in range(3)]
         up = [-rt[i][1] for i in range(3)]
-        cams.append({"name": parts[9], "center": center, "up": up})
+        forward = [rt[i][2] for i in range(3)]
+        cams.append({"name": parts[9], "center": center, "up": up, "forward": forward})
     return cams
 
 

@@ -2,7 +2,7 @@ import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Public } from '../auth/auth.guard';
-import { SERVICE_NAMES } from '../env';
+import { env, SERVICE_NAMES } from '../env';
 import { PythonClient } from '../internal/python-client';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../redis.service';
@@ -22,6 +22,12 @@ export class HealthController {
   @Get('health')
   health() {
     return { status: 'ok' };
+  }
+
+  /** Limits the UI enforces client-side before uploading (the API enforces them again). */
+  @Get('config')
+  config() {
+    return { maxImages: env.maxImages, maxFileBytes: env.maxFileBytes, minImages: env.minImages };
   }
 
   /** 503 only when the API itself cannot work (db/redis); python services are reported individually. */

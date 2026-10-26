@@ -22,6 +22,12 @@ describe('health', () => {
     expect(Object.keys(res.body.checks.services).sort()).toEqual(['geometry', 'recon', 'vision']);
   });
 
+  it('GET /api/v1/config exposes upload limits to the UI', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/config');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ maxImages: expect.any(Number), maxFileBytes: expect.any(Number), minImages: expect.any(Number) });
+  });
+
   it('unknown route returns the structured error shape', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/nope');
     expect(res.status).toBe(404);

@@ -220,3 +220,5 @@ def test_parse_images_txt_gives_centres_and_up_vectors():
     # 90° about X: camera centre C = -R^T t
     assert cams[1]["center"] == pytest.approx([0, -5, 0], abs=1e-5)
     assert cams[1]["up"] == pytest.approx([0, 0, 1], abs=1e-5)
+    assert cams[0]["forward"] == pytest.approx([0, 0, 1])  # camera +Z looks forward
+    assert cams[1]["forward"] == pytest.approx([0, 1, 0], abs=1e-5)

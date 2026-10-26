@@ -8,7 +8,9 @@ from trimesh.visual import ColorVisuals
 
 from s2w_common.app import ServiceError
 
-from .io import load_cloud, save_mesh
+from s2w_common.storage import key_of
+
+from .io import load_cloud, output, save_mesh
 
 MIN_POINTS = 500
 MAX_POINTS = 1_500_000  # downsample beyond this to bound memory/time
@@ -26,6 +28,10 @@ def mesh_from_cloud(source_key: str, prefix: str, dense: bool) -> dict:
         )
 
     pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+    outliers = n_in - len(pcd.points)
+    # SfM leaves stray points far outside the scene; the filtered cloud is what the viewer shows (raw is kept).
+    points_path = output(prefix, "points_filtered.ply")
+    o3d.io.write_point_cloud(str(points_path), pcd)  # pyright: ignore[reportArgumentType]
     if len(pcd.points) > MAX_POINTS:
         pts = np.asarray(pcd.points)
         voxel = float(np.linalg.norm(pts.max(0) - pts.min(0))) / 1500
@@ -58,11 +64,12 @@ def mesh_from_cloud(source_key: str, prefix: str, dense: bool) -> dict:
 
     key = save_mesh(out, prefix, "mesh.glb")
     return {
-        "outputs": {"mesh_glb": key},
+        "outputs": {"mesh_glb": key, "points_ply": key_of(points_path)},
         "stats": {
             "method": "poisson",
             "depth": depth,
             "inputPoints": n_in,
+            "outliersRemoved": outliers,
             "pointsUsed": len(pts),
             "vertices": len(verts),
             "triangles": len(faces),

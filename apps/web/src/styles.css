@@ -1,0 +1,78 @@
+@import 'tailwindcss';
+
+/* Design tokens — see docs/DESIGN_SYSTEM.md */
+@theme {
+  --color-canvas: #16181b;
+  --color-panel: #1d2024;
+  --color-raised: #272b30;
+  --color-line: #353a41;
+  --color-ink: #e6e3dc;
+  --color-muted: #9aa0a6;
+  --color-faint: #6b7178;
+  --color-brass: #c9a45c;
+  --color-brass-strong: #ddb96f;
+  --color-collision: #5fb3c9;
+  --color-walkable: #86b97a;
+  --color-danger: #e0705a;
+  --color-warning: #d9b25a;
+
+  --font-sans: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+
+  --radius-control: 4px;
+  --radius-panel: 8px;
+
+  /* Type scale (1.2 minor third from 15px) */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.62rem;
+  --text-3xl: 2.25rem;
+  --text-display: clamp(2.4rem, 5.2vw, 4.4rem);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 100%;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-size: var(--text-base);
+    line-height: 1.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brass);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-brass) 35%, transparent);
+  }
+}
+
+@utility font-display {
+  font-stretch: 118%;
+  font-weight: 640;
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+}
+
+@utility font-heading {
+  font-stretch: 108%;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

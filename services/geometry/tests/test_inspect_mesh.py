@@ -61,3 +61,17 @@ def test_mesh_rejects_too_few_points(env):
     r = post("/mesh", {"sourceKey": write_cloud(env, "tiny.ply", pts), "outputPrefix": "p/job", "dense": False})
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "insufficient_points"
+
+
+def test_mesh_also_writes_an_outlier_filtered_cloud_for_viewing(env):
+    pts, cols = room_points(30000)
+    rng = np.random.default_rng(5)
+    far = rng.uniform(-80, 80, (60, 3))  # COLMAP-style stray points far outside the room
+    src = write_cloud(env, "sparse.ply", np.vstack([pts, far]), np.vstack([cols, np.full((60, 3), 0.5)]))
+    out = post("/mesh", {"sourceKey": src, "outputPrefix": "p/job", "dense": False}).json()
+    filtered = env / out["outputs"]["points_ply"]
+    r = post("/inspect", {"key": out["outputs"]["points_ply"]}).json()
+    assert filtered.exists() and r["kind"] == "point_cloud"
+    assert np.allclose(r["dimensions"], ROOM, atol=0.3)
+    assert out["stats"]["outliersRemoved"] >= 60
+    assert (env / src).exists()  # the raw cloud is kept
