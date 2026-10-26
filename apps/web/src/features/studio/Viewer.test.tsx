@@ -53,3 +53,14 @@ describe('viewer', () => {
     void userEvent;
   });
 });
+
+describe('model load error messages', () => {
+  it('are plain language and never echo raw URLs or loader internals', async () => {
+    const { loadErrorMessage } = await import('./layers');
+    expect(loadErrorMessage(new Error('fetch for "/api/v1/assets/x/download" responded with 404: Not Found'))).toBe('the file is missing.');
+    expect(loadErrorMessage(new Error('Unexpected token g in JSON at position 0'))).toBe('the file is not a valid 3D model.');
+    const generic = loadErrorMessage(new Error('Could not load /api/v1/assets/x/download: Failed to fetch'));
+    expect(generic).toBe('the download failed or the file is damaged. Retry, or re-run the step that produced it.');
+    expect(generic).not.toContain('/api');
+  });
+});

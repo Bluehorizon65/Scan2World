@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { notFound } from '../common/app-error';
 import { PrismaService } from '../prisma.service';
+import { PythonClient } from '../internal/python-client';
 import { StorageService } from '../storage/storage.service';
 import { CreateProjectDto, ListProjectsQuery, UpdateProjectDto } from './projects.dto';
 
@@ -19,6 +20,7 @@ export class ProjectsService {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private python: PythonClient,
   ) {}
 
   /** The single ownership gate: missing and not-owned are both 404. */
@@ -61,6 +63,16 @@ export class ProjectsService {
 
   async remove(userId: string, projectId: string) {
     await this.getOwned(userId, projectId);
+    // Stop COLMAP for live reconstructions first, or it keeps running and recreates files under the deleted project.
+    const live = await this.prisma.job.findMany({
+      where: { projectId, kind: 'reconstruction', status: { notIn: ['completed', 'failed', 'cancelled'] } },
+      select: { id: true },
+    });
+    await Promise.all(
+      live.map((j) =>
+        this.python.call('recon', 'DELETE', `/jobs/${j.id}`, undefined, { retries: 0 }).catch(() => undefined),
+      ),
+    );
     await this.prisma.project.delete({ where: { id: projectId } });
     await this.storage.remove(`projects/${projectId}`);
   }

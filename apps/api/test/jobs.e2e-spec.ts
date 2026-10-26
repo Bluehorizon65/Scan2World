@@ -253,6 +253,15 @@ describe('reconstruction jobs (stubbed python services)', () => {
     expect(recon.calls.some((c) => c.route === `DELETE /jobs/${created.id}`)).toBe(true);
   });
 
+  it('deleting a project mid-reconstruction stops its COLMAP job', async () => {
+    const { agent, pid } = await projectWithImages();
+    scriptRecon('never');
+    const created = (await agent.post(`/api/v1/projects/${pid}/jobs/reconstruction`).send({ quality: 'draft' })).body;
+    await waitFor(agent, created.id, ['running']);
+    expect((await agent.delete(`/api/v1/projects/${pid}`)).status).toBe(204);
+    expect(recon.calls.some((c) => c.route === `DELETE /jobs/${created.id}`)).toBe(true);
+  });
+
   it('rejects too few images, invalid config, and other users', async () => {
     const { agent, pid } = await projectWithImages(2);
     const few = await agent.post(`/api/v1/projects/${pid}/jobs/reconstruction`).send({ quality: 'draft' });

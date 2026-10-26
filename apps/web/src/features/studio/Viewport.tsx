@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Asset } from '../../api/types';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { AssetLayer } from './AssetLayer';
+import { loadErrorMessage } from './layers';
 import { useStudio } from './store';
 
 /** DOM overlay (outside the canvas): drei's <Html> inside a Suspense fallback breaks on unmount. */
@@ -27,16 +28,13 @@ function LayerBoundary({ asset, children }: { asset: Asset; children: ReactNode 
   return (
     <ErrorBoundary
       resetKey={nonce}
-      fallback={(error) => <ReportOnce id={asset.id} message={`${asset.name} could not be loaded: ${friendly(error)}`} report={reportError} />}
+      fallback={(error) => <ReportOnce id={asset.id} message={`${asset.name} could not be loaded: ${loadErrorMessage(error)}`} report={reportError} />}
     >
       {children}
     </ErrorBoundary>
   );
 }
 
-function friendly(error: Error) {
-  return /404|not found/i.test(error.message) ? 'the file is missing.' : /JSON|magic|glTF|parse|Unexpected/i.test(error.message) ? 'the file is not a valid 3D model.' : error.message;
-}
 
 function ReportOnce({ id, message, report }: { id: string; message: string; report: (id: string, m: string) => void }) {
   useEffect(() => report(id, message), [id, message, report]);
