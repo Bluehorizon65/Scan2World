@@ -1,7 +1,7 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import clsx from 'clsx';
-import { ArrowLeft, Box, Download, Eye, EyeOff, Grid3x3, Maximize, Ruler, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, Box, DoorOpen, Download, Eye, EyeOff, Grid3x3, Maximize, Ruler, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { assetUrl } from '../../api/client';
@@ -33,7 +33,7 @@ const MODES: { value: ViewMode; label: string }[] = [
 ];
 
 export function Toolbar() {
-  const { mode, projection, showGrid, showBounds, set, fit } = useStudio();
+  const { mode, projection, showGrid, showBounds, interior, set, fit } = useStudio();
   const toggle = 'grid size-8 place-items-center rounded-[var(--radius-control)] text-muted hover:text-ink data-[state=on]:bg-raised data-[state=on]:text-ink';
   return (
     <Tooltip.Provider delayDuration={300}>
@@ -53,11 +53,12 @@ export function Toolbar() {
         <span className="h-5 w-px bg-line" aria-hidden />
         <ToggleGroup.Root
           type="multiple"
-          value={[showGrid ? 'grid' : '', showBounds ? 'bounds' : ''].filter(Boolean)}
-          onValueChange={(v) => set({ showGrid: v.includes('grid'), showBounds: v.includes('bounds') })}
+          value={[showGrid ? 'grid' : '', showBounds ? 'bounds' : '', interior ? 'interior' : ''].filter(Boolean)}
+          onValueChange={(v) => set({ showGrid: v.includes('grid'), showBounds: v.includes('bounds'), interior: v.includes('interior') })}
           aria-label="Helpers"
           className="flex"
         >
+          <Tip label="Interior view: cut away walls facing the camera"><ToggleGroup.Item value="interior" aria-label="Interior view" className={toggle}><DoorOpen className="size-4" /></ToggleGroup.Item></Tip>
           <Tip label="Grid"><ToggleGroup.Item value="grid" aria-label="Grid" className={toggle}><Grid3x3 className="size-4" /></ToggleGroup.Item></Tip>
           <Tip label="Bounding box and dimensions"><ToggleGroup.Item value="bounds" aria-label="Bounding box and dimensions" className={toggle}><Ruler className="size-4" /></ToggleGroup.Item></Tip>
         </ToggleGroup.Root>
@@ -200,7 +201,7 @@ export function StudioPage() {
   const units = unitsOf(selected);
 
   return (
-    <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] md:grid-cols-[260px_1fr_300px] md:grid-rows-[1fr_auto]">
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto] md:h-[calc(100dvh-3.5rem)] md:flex-none md:grid-cols-[260px_1fr_300px] md:grid-rows-[minmax(0,1fr)_auto]">
       <aside aria-label="Scene layers" className="border-b border-line bg-panel p-3 md:row-span-1 md:border-b-0 md:border-r md:overflow-auto">
         <Link to={`/projects/${projectId}`} className="mb-3 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
           <ArrowLeft className="size-4" aria-hidden /> {project.data.name}

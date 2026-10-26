@@ -16,12 +16,14 @@ interface StudioState {
   projection: Projection;
   showGrid: boolean;
   showBounds: boolean;
+  /** Cull faces pointing away from the camera: with inward-facing scan normals this cuts away near walls. */
+  interior: boolean;
   visible: Record<string, boolean>;
   stats: Record<string, LayerStats>;
   errors: Record<string, string>;
   reloadNonce: Record<string, number>;
   fitNonce: number;
-  set: (patch: Partial<Pick<StudioState, 'mode' | 'projection' | 'showGrid' | 'showBounds'>>) => void;
+  set: (patch: Partial<Pick<StudioState, 'mode' | 'projection' | 'showGrid' | 'showBounds' | 'interior'>>) => void;
   setVisible: (id: string, on: boolean) => void;
   showOnly: (ids: string[]) => void;
   reportStats: (id: string, s: LayerStats) => void;
@@ -35,6 +37,7 @@ export const useStudio = create<StudioState>((set) => ({
   projection: 'perspective',
   showGrid: true,
   showBounds: false,
+  interior: true,
   visible: {},
   stats: {},
   errors: {},

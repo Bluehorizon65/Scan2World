@@ -127,7 +127,7 @@ function GamemapForm({ source, projectId, onJob }: { source: Asset; projectId: s
   );
 }
 
-function Report({ job }: { job: Job }) {
+function Report({ job, units }: { job: Job; units: string }) {
   const r = job.resultManifest?.report;
   if (!r) return null;
   return (
@@ -135,7 +135,7 @@ function Report({ job }: { job: Job }) {
       <dl className="grid grid-cols-2 gap-3">
         <div><dt className="text-xs text-muted">Visual mesh</dt><dd>{formatNumber(r.visual?.triangles)} triangles</dd></div>
         <div><dt className="text-xs text-muted">Collision mesh</dt><dd>{formatNumber(r.collision?.triangles)} triangles{r.collision?.valid ? '' : ' (check bounds)'}</dd></div>
-        <div><dt className="text-xs text-muted">Walkable area</dt><dd>{r.walkable.areaUnits2.toFixed(2)} units² · {(r.walkable.coverage * 100).toFixed(0)}% of footprint</dd></div>
+        <div><dt className="text-xs text-muted">Walkable area</dt><dd>{r.walkable.areaUnits2.toFixed(2)} {units === 'm' ? 'm²' : 'units²'} · {(r.walkable.coverage * 100).toFixed(0)}% of footprint</dd></div>
         <div><dt className="text-xs text-muted">Walkable confidence</dt><dd className="capitalize">{r.walkable?.confidence}</dd></div>
       </dl>
       {r.alignment && <p className="text-muted">Floor levelled with {r.alignment.confidence} confidence ({r.alignment.method === 'cameras' ? 'camera orientation' : 'geometry'}).</p>}
@@ -195,7 +195,7 @@ export function GamemapPage() {
   const live = job && !isTerminal(job);
 
   return (
-    <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] md:grid-cols-[1fr_360px]">
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[1fr_auto] md:h-[calc(100dvh-3.5rem)] md:flex-none md:grid-cols-[minmax(0,1fr)_360px] md:grid-rows-[minmax(0,1fr)_auto]">
       <section aria-label="Viewport" className="relative min-h-[50vh] overflow-hidden">
         {layers.length > 0 && <Viewport layers={layers} units={unitsOf(source)} />}
         <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap justify-between gap-2">
@@ -245,7 +245,7 @@ export function GamemapPage() {
         {job?.status === 'failed' && <Section title="Last run failed"><JobTimeline job={job} /></Section>}
         {job?.status === 'completed' && job.kind === 'gamemap' && (
           <Section title="Game-map report">
-            <Report job={job} />
+            <Report job={job} units={unitsOf(source)} />
             <Link to={`/projects/${projectId}/export?asset=${gm.visual?.id ?? ''}`} className="inline-flex h-10 items-center justify-center rounded-[var(--radius-control)] bg-brass px-4 font-semibold text-canvas hover:bg-brass-strong">Export these assets</Link>
           </Section>
         )}

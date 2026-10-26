@@ -50,6 +50,7 @@ export function AssetLayer(props: LayerProps) {
 
 function LayerRender({ asset, mode, opacity = 1, geometry }: LayerProps & { geometry: THREE.BufferGeometry }) {
   const reportStats = useStudio((s) => s.reportStats);
+  const side = useStudio((s) => (s.interior ? THREE.FrontSide : THREE.DoubleSide));
   const isCloud = asset.format === 'ply' && !geometry.index;
   const hasColor = !!geometry.attributes.color;
   const overlay = OVERLAY[asset.assetType];
@@ -96,9 +97,9 @@ function LayerRender({ asset, mode, opacity = 1, geometry }: LayerProps & { geom
       {mode === 'wireframe' ? (
         <meshBasicMaterial color="#c9a45c" wireframe transparent opacity={0.7 * opacity} />
       ) : mode === 'color' && hasColor ? (
-        <meshBasicMaterial vertexColors side={THREE.DoubleSide} transparent={opacity < 1} opacity={opacity} />
+        <meshBasicMaterial vertexColors side={side} transparent={opacity < 1} opacity={opacity} />
       ) : (
-        <meshStandardMaterial color="#b8b3a8" roughness={0.85} metalness={0} flatShading side={THREE.DoubleSide} transparent={opacity < 1} opacity={opacity} />
+        <meshStandardMaterial color="#b8b3a8" roughness={0.85} metalness={0} flatShading side={side} transparent={opacity < 1} opacity={opacity} />
       )}
     </mesh>
   );
