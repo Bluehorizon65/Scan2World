@@ -199,3 +199,24 @@ def test_api_contract(env, monkeypatch):
     assert c.post("/jobs/j3", json=missing, headers=H).json()["error"]["code"] == "invalid_input"
     info = c.get("/info", headers=H).json()
     assert info["gpu"] is False and "colmap" in info
+
+
+def test_parse_images_txt_gives_centres_and_up_vectors():
+    from app.pipeline import parse_images_txt
+
+    # COLMAP cameras: x right, y down, z forward; pose is world->camera (q, t).
+    text = (
+        "# Image list with two lines of data per image:\n"
+        "#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n"
+        "1 1 0 0 0 0 0 0 1 a.jpg\n"
+        "\n"
+        "2 0.7071068 0.7071068 0 0 0 0 5 1 b.jpg\n"
+        "100.0 200.0 -1\n"
+    )
+    cams = parse_images_txt(text)
+    assert [c["name"] for c in cams] == ["a.jpg", "b.jpg"]
+    assert cams[0]["center"] == pytest.approx([0, 0, 0])
+    assert cams[0]["up"] == pytest.approx([0, -1, 0])
+    # 90° about X: camera centre C = -R^T t
+    assert cams[1]["center"] == pytest.approx([0, -5, 0], abs=1e-5)
+    assert cams[1]["up"] == pytest.approx([0, 0, 1], abs=1e-5)

@@ -1,7 +1,9 @@
 """COLMAP command construction, output parsing and result selection. No subprocess execution here."""
 
+import json
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -248,6 +250,44 @@ def parse_registered(model_analyzer_output: str) -> tuple[int, int]:
     return (int(reg.group(1)) if reg else 0, int(pts.group(1)) if pts else 0)
 
 
+def _quat_to_rot(qw: float, qx: float, qy: float, qz: float) -> list[list[float]]:
+    return [
+        [1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qz * qw), 2 * (qx * qz + qy * qw)],
+        [2 * (qx * qy + qz * qw), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qx * qw)],
+        [2 * (qx * qz - qy * qw), 2 * (qy * qz + qx * qw), 1 - 2 * (qx * qx + qy * qy)],
+    ]
+
+
+def parse_images_txt(text: str) -> list[dict]:
+    """Camera centres and world-space up vectors from COLMAP images.txt (pose = world->camera, y axis down)."""
+    lines = [ln for ln in text.splitlines() if not ln.startswith("#")]
+    cams = []
+    for line in lines[::2]:  # each image is followed by its 2D-points line (possibly empty)
+        parts = line.split()
+        if len(parts) < 10:
+            continue
+        qw, qx, qy, qz, tx, ty, tz = map(float, parts[1:8])
+        r = _quat_to_rot(qw, qx, qy, qz)
+        rt = [[r[j][i] for j in range(3)] for i in range(3)]  # R^T
+        center = [-sum(rt[i][k] * t for k, t in enumerate((tx, ty, tz))) for i in range(3)]
+        up = [-rt[i][1] for i in range(3)]
+        cams.append({"name": parts[9], "center": center, "up": up})
+    return cams
+
+
+def export_cameras(model: Path, dest: Path) -> int:
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(
+            ["colmap", "model_converter", "--input_path", str(model), "--output_path", tmp, "--output_type", "TXT"],
+            check=True,
+            capture_output=True,
+            timeout=600,
+        )
+        cams = parse_images_txt((Path(tmp) / "images.txt").read_text())
+    dest.write_text(json.dumps({"convention": "world frame of the reconstruction; up = camera -Y", "cameras": cams}))
+    return len(cams)
+
+
 def analyze_model(model: Path) -> tuple[int, int]:
     out = subprocess.run(
         ["colmap", "model_analyzer", "--path", str(model)], capture_output=True, text=True, timeout=300
@@ -289,6 +329,8 @@ def finalize(p: Paths, total_images: int) -> tuple[dict[str, str], dict]:
         timeout=600,
     )
     outputs = {"sparse_ply": key_of(p.sparse_ply)}
+    if export_cameras(model, p.root / "cameras.json"):
+        outputs["cameras_json"] = key_of(p.root / "cameras.json")
     if p.dense_ply.exists() and p.dense_ply.stat().st_size > 1024:
         outputs["dense_ply"] = key_of(p.dense_ply)
     stats = {

@@ -49,16 +49,23 @@ def write_mesh(env, name, mesh: trimesh.Trimesh):
 
 
 def room_mesh(tilt_deg=0.0, offset=(0, 0, 0), seed=0) -> trimesh.Trimesh:
-    """Open-top-free closed room shell (inward faces irrelevant for tests) plus a table, optionally tilted."""
+    """Closed room shell (inward-facing) plus a table, optionally tilted/offset like an arbitrary COLMAP frame."""
     w, h, d = ROOM
     shell = trimesh.creation.box((w, h, d))
     shell.apply_translation((0, h / 2, 0))
+    shell.invert()  # seen from inside, like a real room scan: surfaces face the interior
     table = trimesh.creation.box((1.6, 0.75, 0.9))
     table.apply_translation((0.3, 0.375, -0.4))
-    mesh = trimesh.util.concatenate([shell.subdivide().subdivide().subdivide(), table])
+    mesh = trimesh.util.concatenate(
+        [shell.subdivide().subdivide().subdivide().subdivide(), table.subdivide().subdivide()]
+    )
     rng = np.random.default_rng(seed)
     mesh.vertices += rng.normal(0, 0.003, mesh.vertices.shape)
     if tilt_deg:
         mesh.apply_transform(trimesh.transformations.rotation_matrix(np.radians(tilt_deg), (1, 0, 0.3)))
     mesh.apply_translation(offset)
     return mesh
+
+
+def tilt_matrix(deg: float):
+    return trimesh.transformations.rotation_matrix(np.radians(deg), (1, 0, 0.3))

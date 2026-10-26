@@ -8,6 +8,7 @@ import { JobsService } from '../jobs/jobs.service';
 import { isTerminal } from '../jobs/state-machine';
 import { PrismaService } from '../prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { failJob } from './job-failure';
 import { ShutdownError, WorkerLifecycle } from './lifecycle';
 
 interface ReconConfig {
@@ -67,7 +68,7 @@ export class ReconstructionRunner {
       if (err instanceof Stopped) return;
       // Errors caused by shutdown (closed connections etc.) must not fail the job; the next worker resumes it.
       if (err instanceof ShutdownError || this.lifecycle.stopping) throw new ShutdownError();
-      await this.fail(jobId, err);
+      await failJob(this.prisma, this.jobs, jobId, err);
     }
   }
 
@@ -222,20 +223,5 @@ export class ReconstructionRunner {
         .call('recon', 'DELETE', `/jobs/${job.id}`)
         .catch((e: unknown) => this.logger.warn(`cancel: ${String(e)}`));
     await this.jobs.transition(job.id, 'cancelled', { message: 'Cancelled' });
-  }
-
-  private async fail(jobId: string, err: unknown) {
-    const known = err instanceof AppError;
-    if (!known) this.logger.error(err);
-    const details =
-      known && err.details && typeof err.details === 'object' ? (err.details as Record<string, unknown>) : {};
-    const current = await this.prisma.job.findUnique({ where: { id: jobId } });
-    if (!current || isTerminal(current.status)) return;
-    await this.jobs.transition(jobId, 'failed', {
-      errorCode: known ? err.code : 'internal_error',
-      errorMessage: known ? err.message : 'Unexpected processing error',
-      message: known ? err.message : 'Unexpected processing error',
-      diagnostics: details,
-    });
   }
 }

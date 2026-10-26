@@ -3,7 +3,8 @@
 import numpy as np
 import open3d as o3d
 import trimesh
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
+from trimesh.visual import ColorVisuals
 
 from s2w_common.app import ServiceError
 
@@ -17,8 +18,12 @@ def mesh_from_cloud(source_key: str, prefix: str, dense: bool) -> dict:
     pcd = load_cloud(source_key)
     n_in = len(pcd.points)
     if n_in < MIN_POINTS:
-        raise ServiceError("insufficient_points", f"Only {n_in} points were reconstructed; at least {MIN_POINTS} are "
-                           "needed to build a surface. Add more overlapping photos.", status=422)
+        raise ServiceError(
+            "insufficient_points",
+            f"Only {n_in} points were reconstructed; at least {MIN_POINTS} are "
+            "needed to build a surface. Add more overlapping photos.",
+            status=422,
+        )
 
     pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
     if len(pcd.points) > MAX_POINTS:
@@ -38,7 +43,7 @@ def mesh_from_cloud(source_key: str, prefix: str, dense: bool) -> dict:
     mesh.remove_vertices_by_mask(densities < np.quantile(densities, 0.02 if dense else 0.08))
     # Poisson extrapolates beyond the data; keep only the region the points support.
     aabb = pcd.get_axis_aligned_bounding_box()
-    mesh = mesh.crop(aabb.scale(1.02, aabb.get_center()))
+    mesh = mesh.crop(aabb.scale(1.02, aabb.get_center()))  # pyright: ignore[reportCallIssue, reportArgumentType]
     mesh.remove_degenerate_triangles()
     mesh.remove_unreferenced_vertices()
 
@@ -47,13 +52,19 @@ def mesh_from_cloud(source_key: str, prefix: str, dense: bool) -> dict:
         raise ServiceError("meshing_failed", "No surface could be built from the reconstructed points.", status=422)
     out = trimesh.Trimesh(verts, faces, process=False)
     if pcd.has_colors():
-        _, idx = cKDTree(pts).query(verts, k=1, workers=-1)
+        _, idx = KDTree(pts).query(verts, k=1, workers=-1)
         colors = (np.asarray(pcd.colors)[idx] * 255).astype(np.uint8)
-        out.visual = trimesh.visual.ColorVisuals(out, vertex_colors=np.column_stack([colors, np.full(len(colors), 255, np.uint8)]))
+        out.visual = ColorVisuals(out, vertex_colors=np.column_stack([colors, np.full(len(colors), 255, np.uint8)]))
 
     key = save_mesh(out, prefix, "mesh.glb")
     return {
         "outputs": {"mesh_glb": key},
-        "stats": {"method": "poisson", "depth": depth, "inputPoints": n_in, "pointsUsed": len(pts),
-                  "vertices": len(verts), "triangles": len(faces)},
+        "stats": {
+            "method": "poisson",
+            "depth": depth,
+            "inputPoints": n_in,
+            "pointsUsed": len(pts),
+            "vertices": len(verts),
+            "triangles": len(faces),
+        },
     }

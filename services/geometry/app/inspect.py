@@ -32,6 +32,6 @@ def inspect(key: str) -> dict:
         "components": component_count(mesh),
         "watertight": bool(mesh.is_watertight),
         "area": round(float(mesh.area), 4),
-        "hasColors": mesh.visual.kind == "vertex",
-        "hasUVs": mesh.visual.kind == "texture",
+        "hasColors": mesh.visual is not None and mesh.visual.kind == "vertex",
+        "hasUVs": mesh.visual is not None and mesh.visual.kind == "texture",
     }

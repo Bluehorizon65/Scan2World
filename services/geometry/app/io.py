@@ -39,7 +39,7 @@ def load_mesh(key: str) -> trimesh.Trimesh:
 
 def load_cloud(key: str) -> o3d.geometry.PointCloud:
     path = existing(key)
-    pcd = o3d.io.read_point_cloud(str(path))
+    pcd = o3d.io.read_point_cloud(str(path))  # pyright: ignore[reportArgumentType]
     if len(pcd.points) == 0:
         raise ServiceError("unreadable_geometry", "The point cloud is empty or unreadable", status=422)
     return pcd
@@ -56,7 +56,7 @@ def save_mesh(mesh: trimesh.Trimesh, prefix: str, name: str) -> str:
     path = output(prefix, name)
     mesh.export(path)
     check = trimesh.load(path, force="mesh", process=False)
-    if len(check.faces) != len(mesh.faces):
+    if not isinstance(check, trimesh.Trimesh) or len(check.faces) != len(mesh.faces):
         raise ServiceError("export_validation_failed", f"{name} did not reload correctly", status=500)
     return key_of(path)
 
