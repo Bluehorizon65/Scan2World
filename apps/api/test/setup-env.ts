@@ -18,3 +18,5 @@ process.env.SERVICE_TOKEN ??= dotenv.SERVICE_TOKEN;
 process.env.DATA_DIR ??= mkdtempSync(join(tmpdir(), 's2w-data-'));
 process.env.LOG_LEVEL ??= 'silent';
 process.env.WEB_ORIGIN ??= 'http://localhost:8080';
+process.env.AUTH_RATE_LIMIT ??= '1000';
+process.env.RATE_LIMIT ??= '100000';

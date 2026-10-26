@@ -35,7 +35,7 @@ def get_logger(service: str) -> logging.Logger:
         h = logging.StreamHandler(sys.stdout)
         h.setFormatter(_JsonFormatter())
         log.addHandler(h)
-        log.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+        log.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
         log.propagate = False
     return log
 

@@ -55,3 +55,8 @@ def test_errors_are_structured_without_traceback():
     r = TestClient(app, raise_server_exceptions=False).get("/boom", headers={"X-Service-Token": "secret"})
     assert r.status_code == 500
     assert r.json() == {"error": {"code": "internal_error", "message": "Internal processing error"}}
+
+
+def test_lowercase_log_level_accepted(monkeypatch):
+    monkeypatch.setenv("LOG_LEVEL", "info")
+    create_app("lowercase-level")

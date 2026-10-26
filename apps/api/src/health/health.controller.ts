@@ -1,6 +1,7 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { Public } from '../auth/auth.guard';
 import { SERVICE_NAMES } from '../env';
 import { PythonClient } from '../internal/python-client';
 import { PrismaService } from '../prisma.service';
@@ -9,6 +10,7 @@ import { RedisService } from '../redis.service';
 const up = (ok: boolean) => (ok ? 'up' : 'down');
 
 @ApiTags('system')
+@Public()
 @Controller()
 export class HealthController {
   constructor(
