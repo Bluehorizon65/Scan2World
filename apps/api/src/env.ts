@@ -28,7 +28,7 @@ export const env = {
     return Number(process.env.MAX_IMAGES ?? 200);
   },
   get maxFileBytes() {
-    return Number(process.env.MAX_FILE_MB ?? 40) * 1024 * 1024;
+    return Math.floor(Number(process.env.MAX_FILE_MB ?? 40) * 1024 * 1024);
   },
   get minFreeDiskBytes() {
     return Number(process.env.MIN_FREE_DISK_GB ?? 5) * 1024 ** 3;

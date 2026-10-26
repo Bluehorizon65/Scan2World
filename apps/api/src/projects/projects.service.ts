@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { notFound } from '../common/app-error';
 import { PrismaService } from '../prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateProjectDto, ListProjectsQuery, UpdateProjectDto } from './projects.dto';
 
 const summary = {
@@ -15,7 +16,10 @@ const summary = {
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   /** The single ownership gate: missing and not-owned are both 404. */
   async getOwned(userId: string, projectId: string) {
@@ -58,5 +62,6 @@ export class ProjectsService {
   async remove(userId: string, projectId: string) {
     await this.getOwned(userId, projectId);
     await this.prisma.project.delete({ where: { id: projectId } });
+    await this.storage.remove(`projects/${projectId}`);
   }
 }
