@@ -102,6 +102,7 @@ model Job {
   errorCode      String?
   errorMessage   String?
   diagnostics    Json       @default("{}")
+  progress       Json?
   resultManifest Json?
   attempts       Int        @default(0)
   createdAt      DateTime   @default(now())

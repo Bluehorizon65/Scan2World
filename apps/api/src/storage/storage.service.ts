@@ -46,8 +46,8 @@ export class StorageService {
     );
   }
 
-  read(key: string) {
-    return createReadStream(this.path(key));
+  read(key: string, start?: number) {
+    return createReadStream(this.path(key), { start });
   }
 
   async remove(keyOrPrefix: string) {

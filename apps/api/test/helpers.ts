@@ -25,5 +25,6 @@ export async function newUser(app: INestApplication) {
   const agent = request.agent(app.getHttpServer());
   const res = await agent.post('/api/v1/auth/register').send({ email, password: 'correct-horse-battery' });
   if (res.status !== 201) throw new Error(`register failed: ${res.status} ${JSON.stringify(res.body)}`);
-  return { agent, email, id: res.body.user.id as string };
+  const cookie = String(res.headers['set-cookie']).split(';')[0];
+  return { agent, email, cookie, id: res.body.user.id as string };
 }

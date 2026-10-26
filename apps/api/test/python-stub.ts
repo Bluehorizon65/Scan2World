@@ -10,6 +10,8 @@ type Handler = (
 export class PythonStub {
   private server!: Server;
   handlers = new Map<string, Handler>();
+  /** Used when no exact route matches (e.g. routes containing ids not known yet). */
+  fallback?: (route: string, body: any) => ReturnType<Handler> | undefined;
   calls: { route: string; body: any; token?: string }[] = [];
 
   async start(): Promise<string> {
@@ -26,7 +28,10 @@ export class PythonStub {
             (route.startsWith('GET /health') ? (): ReturnType<Handler> => ({ body: { status: 'ok' } }) : undefined);
           const out = handler
             ? await handler(body, req)
-            : { status: 404, body: { error: { code: 'not_found', message: route } } };
+            : ((await this.fallback?.(route, body)) ?? {
+                status: 404,
+                body: { error: { code: 'not_found', message: route } },
+              });
           res.writeHead(out.status ?? 200, { 'content-type': 'application/json' });
           res.end(JSON.stringify(out.body));
         })();

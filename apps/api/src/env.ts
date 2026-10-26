@@ -27,6 +27,12 @@ export const env = {
   get maxImages() {
     return Number(process.env.MAX_IMAGES ?? 200);
   },
+  get minImages() {
+    return Number(process.env.MIN_IMAGES ?? 3);
+  },
+  get pollMs() {
+    return Number(process.env.POLL_MS ?? 2000);
+  },
   get maxFileBytes() {
     return Math.floor(Number(process.env.MAX_FILE_MB ?? 40) * 1024 * 1024);
   },
