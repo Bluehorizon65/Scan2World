@@ -1,0 +1,13 @@
+{
+  "name": "scan2world-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixture": "node fixtures/render-room/render.mjs",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "three": "^0.180.0"
+  }
+}

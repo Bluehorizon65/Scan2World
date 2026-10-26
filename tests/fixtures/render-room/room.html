@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>html,body{margin:0;background:#000}canvas{display:block}</style>
+  <script type="importmap">{ "imports": { "three": "/three/build/three.module.js" } }</script>
+</head>
+<body>
+<script type="module">
+// Deterministic synthetic room for photogrammetry tests: unique procedural textures on every surface
+// (SfM needs distinctive features), unlit materials (consistent appearance between views),
+// and an inward-looking camera loop with strong overlap.
+import * as THREE from 'three';
+
+const params = new URLSearchParams(location.search);
+const W = Number(params.get('w') ?? 1600), H = Number(params.get('h') ?? 1200);
+
+let seed = 1337;
+const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+
+function texture(label, px = 2048) {
+  const c = document.createElement('canvas');
+  c.width = c.height = px;
+  const g = c.getContext('2d');
+  g.fillStyle = `hsl(${rand() * 360},30%,${45 + rand() * 20}%)`;
+  g.fillRect(0, 0, px, px);
+  for (let i = 0; i < 900; i++) {
+    g.fillStyle = `hsl(${rand() * 360},${40 + rand() * 50}%,${20 + rand() * 60}%)`;
+    const x = rand() * px, y = rand() * px, s = 6 + rand() * 90;
+    if (rand() < 0.5) g.fillRect(x, y, s, s * (0.3 + rand()));
+    else { g.beginPath(); g.arc(x, y, s / 2, 0, Math.PI * 2); g.fill(); }
+  }
+  g.font = 'bold 64px sans-serif';
+  for (let i = 0; i < 30; i++) {
+    g.fillStyle = rand() < 0.5 ? '#111' : '#f5f5f5';
+    g.fillText(`${label}-${i}`, rand() * px, rand() * px);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+const mat = (label) => new THREE.MeshBasicMaterial({ map: texture(label), side: THREE.DoubleSide });
+const scene = new THREE.Scene();
+
+// Room: 6m x 3m x 5m, floor at y=0.
+const RW = 6, RH = 3, RD = 5;
+const plane = (w, h, m, pos, rot) => {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m);
+  mesh.position.set(...pos);
+  mesh.rotation.set(...rot);
+  scene.add(mesh);
+};
+plane(RW, RD, mat('floor'), [0, 0, 0], [-Math.PI / 2, 0, 0]);
+plane(RW, RD, mat('ceil'), [0, RH, 0], [Math.PI / 2, 0, 0]);
+plane(RW, RH, mat('north'), [0, RH / 2, -RD / 2], [0, 0, 0]);
+plane(RW, RH, mat('south'), [0, RH / 2, RD / 2], [0, Math.PI, 0]);
+plane(RD, RH, mat('west'), [-RW / 2, RH / 2, 0], [0, Math.PI / 2, 0]);
+plane(RD, RH, mat('east'), [RW / 2, RH / 2, 0], [0, -Math.PI / 2, 0]);
+
+// Furniture.
+const box = (w, h, d, x, z, label) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(label));
+  m.position.set(x, h / 2, z);
+  scene.add(m);
+};
+box(1.6, 0.75, 0.9, 0.3, -0.4, 'table');
+box(0.5, 1.9, 1.4, -2.6, 1.2, 'shelf');
+box(0.8, 0.45, 0.8, 1.8, 1.4, 'stool');
+box(2.0, 0.85, 0.9, -1.0, -2.0, 'sofa');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(65, W / H, 0.05, 50);
+
+// Camera i of n: walk an ellipse near the walls at eye height, looking across the room.
+window.renderView = (i, n) => {
+  const a = (i / n) * Math.PI * 2;
+  const y = 1.45 + 0.15 * Math.sin(a * 3);
+  camera.position.set(2.3 * Math.cos(a), y, 1.8 * Math.sin(a));
+  const look = a + Math.PI + 0.35 * Math.sin(a * 2);
+  camera.lookAt(1.2 * Math.cos(look), 0.9, 1.0 * Math.sin(look));
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL('image/jpeg', 0.92);
+};
+window.ready = true;
+</script>
+</body>
+</html>

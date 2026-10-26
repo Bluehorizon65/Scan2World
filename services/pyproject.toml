@@ -5,7 +5,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
-ignore = ["S101", "S603", "B008"]
+ignore = ["S101", "S603", "S607", "B008"]
 
 [tool.pyright]
 pythonVersion = "3.12"
@@ -13,7 +13,7 @@ extraPaths = ["common"]
 typeCheckingMode = "basic"
 venvPath = "."
 venv = ".venv"
-exclude = [".venv", "**/__pycache__"]
+exclude = [".venv", "**/__pycache__", "**/tests"]
 
 [tool.pytest.ini_options]
 pythonpath = ["common"]
